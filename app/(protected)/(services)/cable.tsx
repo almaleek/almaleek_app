@@ -1,0 +1,368 @@
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Modal,
+} from "react-native";
+
+import { useDispatch, useSelector } from "react-redux";
+import { useRouter } from "expo-router";
+import { Formik } from "formik";
+import { ChevronRight } from "lucide-react-native";
+
+import ApSafeAreaView from "@/components/safeAreaView/safeAreaView";
+import ApScrollView from "@/components/scrollview/scrollview";
+import ApHeader from "@/components/headers/header";
+import ApTextInput from "@/components/textInput/textInput";
+import PinModal from "@/components/modals/pinModal";
+
+import { RootState } from "@/redux/store";
+import { cableLogos } from "@/constants/cabletvlogo";
+import {
+  getCableServices,
+  fetchDataCategories,
+  handleVerifyTvSub,
+  fetchDataPlans,
+  purchaseTvSub,
+} from "@/redux/features/easyAccess/service";
+import { useToast } from "@/components/toast/toastProvider";
+import BannerCarousel from "@/components/carousel/banner";
+
+// Banner Images
+const banners = [
+  require("../../../assets/images/banner1.png"),
+  require("../../../assets/images/banner2.png"),
+  require("../../../assets/images/banner3.png"),
+];
+
+export default function CableScreen() {
+  const dispatch = useDispatch<any>();
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  // GLOBAL STATE
+  const { user } = useSelector((state: RootState) => state.auth);
+  const { cableServices, plans } = useSelector(
+    (state: RootState) => state.easyAccessdataPlans
+  );
+
+  // LOCAL STATE
+  const [selectedProvider, setSelectedProvider] = useState("DSTV");
+  const [planCategory, setPlanCategory] = useState<string[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [customerDetails, setCustomerDetails] = useState<any>({});
+  const [providerModal, setProviderModal] = useState(false);
+  const [pinVisible, setPinVisible] = useState(false);
+  const [smartCardNo, setSmartCardNo] = useState("");
+  const [pinCode, setPinCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("HOT");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [cablePlans, setCablePlans] = useState();
+
+  const defaultProvider = {
+    name: "DSTV",
+    logo: cableLogos.default,
+  };
+
+  /** ------------------------
+   *  LOAD PROVIDERS ON MOUNT
+   * ------------------------ */
+  useEffect(() => {
+    dispatch(getCableServices());
+  }, [dispatch]);
+
+  const onProviderChoose = async (providerName: string) => {
+    setSelectedProvider(providerName);
+    setProviderModal(false);
+
+    try {
+      const result = await dispatch(
+        fetchDataCategories({
+          serviceType: "cable",
+          network: providerName.toLowerCase(),
+        })
+      );
+
+      if (fetchDataCategories.fulfilled.match(result)) {
+        setPlanCategory(result.payload || []);
+      }
+    } catch {
+      showToast("Failed to fetch categories", "error");
+    }
+  };
+
+  const handleVerify = async (smartcardNumber: string) => {
+    setIsVerifying(true);
+    try {
+      const resultAction = await dispatch(
+        handleVerifyTvSub({
+          smartCardNo: smartcardNumber,
+          cableType: selectedProvider,
+        })
+      );
+
+      if (handleVerifyTvSub.fulfilled.match(resultAction)) {
+        const { customerName } = resultAction.payload;
+        setCustomerDetails({ name: customerName || "N/A" });
+        setIsVerifying(true);
+        showToast("✅ Smart Card verified!", "success"); // ✅ Safe to call
+      } else {
+        showToast(resultAction.payload, "error");
+        setIsVerifying(false);
+      }
+    } catch {
+      showToast("❌ Verification failed", "error");
+      setIsVerifying(false);
+    }
+  };
+
+  /** ------------------------
+   *  SELECT CATEGORY → LOAD PLANS
+   * ------------------------ */
+  const handleCategory = async (category: string) => {
+    try {
+      const result = await dispatch(
+        fetchDataPlans({ network: selectedProvider, category })
+      );
+      if (fetchDataPlans.fulfilled.match(result)) {
+        setCablePlans(result.payload as any);
+      } else {
+        showToast(result.payload || "Failed to fetch plans", "error");
+      }
+    } catch {
+      showToast("Unexpected error while fetching plans", "error");
+    }
+  };
+
+  useEffect(() => {
+    handleCategory(selectedProvider);
+  }, [selectedProvider]);
+
+  /** ------------------------
+   *  PURCHASE (triggered from PIN modal)
+   * ------------------------ */
+  const handlePurchase = async (pin: string) => {
+    if (!selectedPlan) return alert("Select a plan");
+
+    const payload = {
+      customerName: customerDetails.name,
+      provider: selectedProvider,
+      userId: user?._id,
+      planId: selectedPlan._id,
+      smartCardNo,
+      phone: "07000000000",
+      amount: Number(selectedPlan.ourPrice),
+      pinCode: pin,
+    };
+
+    try {
+      setLoading(true);
+
+      const result = await dispatch(purchaseTvSub({ payload }));
+
+      if (purchaseTvSub.fulfilled.match(result)) {
+        const { request_id } = result.payload;
+        router.push({
+          pathname: "/(protected)/history/[id]",
+          params: { id: request_id },
+        });
+      } else {
+        showToast(result.payload || "Purchase failed!", "error");
+      }
+    } catch {
+      showToast("Error processing subscription", "error");
+    } finally {
+      setLoading(false);
+      setPinVisible(false);
+      setPinCode("");
+    }
+  };
+
+  /** Utility */
+  const formatProvider = (prov: string) =>
+    prov
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "") || "default";
+
+  const tabs = ["HOT", "Premium"];
+
+  return (
+    <ApSafeAreaView>
+      <ApHeader title="Cable TV Subscription" />
+
+      <ApScrollView style={{ backgroundColor: "white" }}>
+        <BannerCarousel
+          images={banners}
+          heightRatio={0.25}
+          borderRadius={16}
+          autoplayInterval={4000}
+        />
+        <Formik initialValues={{ smartcard: "" }} onSubmit={() => {}}>
+          {({ setFieldValue, values }) => (
+            <View>
+              {/* Provider Selector */}
+              <TouchableOpacity
+                className="p-4 border-b border-gray-300 rounded-xl flex-row gap-4 items-center mb-4"
+                onPress={() => {
+                  setProviderModal(true);
+                  handleCategory(selectedProvider);
+                }}
+              >
+                <View className="flex-1 flex-row justify-between">
+                  <View className="flex-1 flex-row gap-4 items-center">
+                    {selectedProvider && (
+                      <Image
+                        source={
+                          selectedProvider
+                            ? cableLogos[formatProvider(selectedProvider)] ||
+                              cableLogos.default
+                            : defaultProvider.logo
+                        }
+                        style={{ width: 35, height: 35, borderRadius: 8 }}
+                      />
+                    )}
+
+                    <Text className="text-gray-700 font-semibold text-base">
+                      {selectedProvider || "Select Cable Provider"}
+                    </Text>
+                  </View>
+
+                  <ChevronRight color="gray" />
+                </View>
+              </TouchableOpacity>
+              <ApTextInput
+                label="SmartCard Number"
+                name="smartcard"
+                placeholder="Enter Your SmartCard Number"
+                value={smartCardNo}
+                loading={isVerifying} // <-- control this from parent
+                onChange={(value: any) => {
+                  setSmartCardNo(value);
+                  setFieldValue("smartcard", value);
+
+                  if (value.length === 10) {
+                    setIsVerifying(true);
+                    handleVerify(value).finally(() => setIsVerifying(false));
+                  }
+                }}
+              />
+
+              {/* Tabs */}
+              <View className="px-4 mt-6">
+                <Text className="text-gray-800 text-lg font-semibold mb-3">
+                  TV Plans
+                </Text>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {tabs.map((t, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => setActiveTab(t)}
+                      className="mr-6 pb-2"
+                    >
+                      <Text
+                        className={`text-base ${
+                          activeTab === t
+                            ? "text-green-600 font-bold"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {t}
+                      </Text>
+
+                      {activeTab === t && (
+                        <View className="h-1 bg-green-600 mt-1 rounded-full" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Plan Grid */}
+              <View className="px-4 mt-4 flex-row flex-wrap justify-between">
+                {plans.map((p, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => {
+                      setSelectedPlan(p);
+                      setPinVisible(true);
+                    }}
+                    className="w-[32%] bg-gray-100 border border-gray-200 rounded-xl p-4 mb-4"
+                  >
+                    <Text className="text-[10px] font-semibold  text-center">
+                      {p?.name}
+                    </Text>
+                    <Text className="text-gray-600 text-sm mt-1 text-center bg-green-100 px-2 py-1 rounded-full">
+                      {p?.validity}
+                    </Text>
+                    <Text className="text-green-600 font-semibold mt-1 text-center text-lg">
+                      {p?.ourPrice}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Provider Modal */}
+              <Modal visible={providerModal} transparent animationType="fade">
+                <View className="flex-1 bg-black/40 justify-center items-center">
+                  <View className="w-[90%] bg-white p-5 rounded-2xl">
+                    <Text className="text-xl font-semibold mb-4">
+                      Select Provider
+                    </Text>
+
+                    <ScrollView>
+                      {cableServices?.map((item: any) => {
+                        const formatted = formatProvider(item.name);
+                        return (
+                          <TouchableOpacity
+                            key={item._id}
+                            className="flex-row items-center p-3 border-b"
+                            onPress={() => onProviderChoose(item.name)}
+                          >
+                            <Image
+                              source={cableLogos[formatted]}
+                              style={{ width: 40, height: 40 }}
+                            />
+                            <Text className="ml-3 text-base font-semibold">
+                              {item.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+
+                    <TouchableOpacity
+                      className="mt-4 p-3 bg-red-500 rounded-lg"
+                      onPress={() => setProviderModal(false)}
+                    >
+                      <Text className="text-white text-center font-semibold">
+                        Close
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Modal>
+
+              {/* PIN Modal */}
+              <PinModal
+                visible={pinVisible}
+                loading={loading}
+                onClose={() => !loading && setPinVisible(false)}
+                onSubmit={(pin) => {
+                  setPinCode(pin);
+                  handlePurchase(pin);
+                }}
+              />
+            </View>
+          )}
+        </Formik>
+      </ApScrollView>
+    </ApSafeAreaView>
+  );
+}
