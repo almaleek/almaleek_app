@@ -17,19 +17,19 @@ const slides = [
     id: "1",
     title: "Affordable Data Services",
     subtitle: "Enjoy low-cost data plans from major network providers.",
-    image: require("../assets/images/onboarding1.png"),
+    image: require("../../assets/images/onboarding1.png"),
   },
   {
     id: "2",
     title: "Seamless Data Purchases",
     subtitle: "Easily recharge your mobile data through a secure platform",
-    image: require("../assets/images/onboarding2.png"),
+    image: require("../../assets/images/onboarding2.png"),
   },
   {
     id: "3",
     title: "Track Usage & Savings",
     subtitle: "Monitor your data usage and total savings.",
-    image: require("../assets/images/onboarding3.png"),
+    image: require("../../assets/images/onboarding3.png"),
   },
 ];
 
@@ -59,7 +59,10 @@ export default function OnboardingScreen() {
     }
   };
 
-  const skip = () => router.push("/(auth)/signin");
+  const skip = async () => {
+    await AsyncStorage.setItem("hasSeenOnboarding", "true");
+    router.push("/(auth)/signin");
+  };
 
   return (
     <View className="flex-1 bg-white">

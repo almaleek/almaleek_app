@@ -58,7 +58,6 @@ export default function ExamScreen() {
   }, [dispatch]);
 
   const handleCategorySelect = async (category: string) => {
-    console.log(category, "the category");
     try {
       const result = await dispatch(
         fetchDataPlans({ category: category, network: category })
@@ -66,7 +65,6 @@ export default function ExamScreen() {
       if (fetchDataPlans.fulfilled.match(result)) {
         const fetchedPrice = result.payload.plans[0]?.ourPrice || 0;
         setUnitPrice(fetchedPrice || 0);
-        console.log(unitPrice, "the unit");
       } else {
         showToast(result.payload || "Failed to fetch plans", "error");
       }
@@ -115,8 +113,6 @@ export default function ExamScreen() {
         pinCode: enteredPin,
       };
 
-      console.log(payload);
-
       setLoading(true);
 
       const result = await dispatch(purchaseExam({ payload }));
@@ -145,7 +141,6 @@ export default function ExamScreen() {
       showToast(result?.payload || "Exam purchase failed..", "error");
     } catch (error: any) {
       setLoading(false);
-      console.log("ERROR PROCESSING PAYMENT:", error);
       showToast(error?.message || "Something went wrong! Try again.", "error");
     } finally {
       setLoading(false);

@@ -1,53 +1,60 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL = "http://10.120.63.142:5000/api"; // adjust if needed
+const API_URL = "http://172.18.131.142:5000/api";
 
 let isRefreshing = false;
 let subscribers: ((token: string) => void)[] = [];
 
-function onRefreshed(token: string) {
+// Injected logout handler (Redux)
+let logoutHandler: (() => void) | null = null;
+export const injectLogoutHandler = (handler: () => void) => {
+  logoutHandler = handler;
+};
+
+// Notify all queued requests after refresh
+const notifySubscribers = (token: string) => {
   subscribers.forEach((cb) => cb(token));
   subscribers = [];
-}
+};
 
-function addSubscriber(callback: (token: string) => void) {
+// Queue requests while refreshing
+const subscribeTokenRefresh = (callback: (token: string) => void) => {
   subscribers.push(callback);
-}
+};
 
+// Axios instance
 const axiosInstance = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach access token from AsyncStorage
+// Attach access token to requests
 axiosInstance.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem("accessToken");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const accessToken = await AsyncStorage.getItem("accessToken");
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
 
-// Response interceptor to handle refresh
+// Handle responses
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-    const status = error.response?.status;
-    const message = error.response?.data?.error;
+    const originalRequest = error.config as any;
 
-    if (
-      status === 401 &&
-      message === "Token expired" &&
-      !originalRequest._retry
-    ) {
+    const status = error.response?.status;
+    const errorMessage = error.response?.data?.error;
+
+    // 🔐 Access token expired → refresh
+    if (errorMessage === "Token expired" && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      // If refresh already in progress, wait
       if (isRefreshing) {
         return new Promise((resolve) => {
-          addSubscriber((token) => {
+          subscribeTokenRefresh((token) => {
             originalRequest.headers.Authorization = `Bearer ${token}`;
             resolve(axiosInstance(originalRequest));
           });
@@ -58,38 +65,35 @@ axiosInstance.interceptors.response.use(
 
       try {
         const refreshToken = await AsyncStorage.getItem("refreshToken");
-        if (!refreshToken) throw new Error("No refresh token");
+        if (!refreshToken) throw new Error("Missing refresh token");
 
         const { data } = await axios.post(`${API_URL}/auth/refresh`, {
           refreshToken,
         });
+
         const newAccessToken = data.accessToken;
 
+        // Store & apply new token
         await AsyncStorage.setItem("accessToken", newAccessToken);
+        axiosInstance.defaults.headers.Authorization = `Bearer ${newAccessToken}`;
 
-        // Notify all subscribers waiting for the new token
-        onRefreshed(newAccessToken);
+        notifySubscribers(newAccessToken);
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return axiosInstance(originalRequest);
-      } catch (err: any) {
-        console.error(
-          "Token refresh failed:",
-          err.message || err.response?.data?.error
-        );
-        await AsyncStorage.clear();
-        // ⚠️ Dispatch logout action from your thunk, not here
-        return Promise.reject(err);
+      } catch (refreshError) {
+        // 🔥 Refresh failed → logout
+        if (logoutHandler) logoutHandler();
+        return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
     }
 
-    // Handle other 401 cases
-    if (status === 401 && message === "Logged in on another device") {
-      await AsyncStorage.clear();
-      // ⚠️ Dispatch logout action from your thunk, not here
-    }
+    // Any other 401 → logout
+    // if (status === 401 && logoutHandler) {
+    //   logoutHandler();
+    // }
 
     return Promise.reject(error);
   }

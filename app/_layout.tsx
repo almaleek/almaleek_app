@@ -1,5 +1,5 @@
-import { Slot } from "expo-router";
-import { Provider, useDispatch } from "react-redux";
+import { Slot, useRouter } from "expo-router";
+import { Provider, useDispatch, useSelector } from "react-redux";
 import { store } from "@/redux/store";
 import {
   ThemeProvider,
@@ -12,17 +12,28 @@ import "../global.css";
 import { ToastProvider } from "@/components/toast/toastProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { setTokens, logout } from "@/redux/features/user/userSlice";
-import { useRouter } from "expo-router";
+import ApLoader from "@/components/loaders/mainloader";
+import { injectLogoutHandler } from "@/redux/apis/common/aixosInstance";
 
 function AppContent() {
   const colorScheme = useColorScheme();
   const dispatch = useDispatch();
   const router = useRouter();
-  const [appReady, setAppReady] = useState(false);
 
-  const theme = useMemo(() => {
-    return colorScheme === "light" ? DarkTheme : DefaultTheme;
-  }, [colorScheme]);
+  const [appReady, setAppReady] = useState(false);
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
+
+  const theme = useMemo(
+    () => (colorScheme === "dark" ? DefaultTheme : DarkTheme),
+    [colorScheme]
+  );
+
+  useEffect(() => {
+    injectLogoutHandler(() => {
+      dispatch(logout());
+      router.replace("/(auth)/signin");
+    });
+  }, []);
 
   useEffect(() => {
     const loadAppState = async () => {
@@ -30,39 +41,56 @@ function AppContent() {
         const accessToken = await AsyncStorage.getItem("accessToken");
         const refreshToken = await AsyncStorage.getItem("refreshToken");
         const hasSeen = await AsyncStorage.getItem("hasSeenOnboarding");
+        const hasPasscode = await AsyncStorage.getItem("app_passcode");
 
-        // FIRST TIME USER
         if (!hasSeen) {
-          router.replace("/onboarding");
-          return setAppReady(true);
+          setInitialRoute("/onboarding");
+          setAppReady(true);
+          return;
         }
 
-        // USER HAS TOKEN → LOG THEM IN
+        // 2️⃣ User logged in
         if (accessToken && refreshToken) {
           dispatch(setTokens({ accessToken, refreshToken }));
-          router.replace("/(auth)/passcode");
-        } else {
-          // USER NOT LOGGED IN
-          dispatch(logout());
-          router.replace("/(auth)/signin");
+          setInitialRoute("/(security)/passcode");
+          setAppReady(true);
+          return;
         }
-
+        dispatch(logout());
+        setInitialRoute("/(auth)/signin");
         setAppReady(true);
       } catch (err) {
+        console.log("App load error:", err);
         dispatch(logout());
-        router.replace("/(auth)/signin");
+        setInitialRoute("/(auth)/signin");
+        setAppReady(true);
       }
     };
 
     loadAppState();
-  }, []); // <-- RUN ONLY ON APP START
+  }, []);
 
-  // if (!appReady) return null;
+  // Navigate after appReady
+  useEffect(() => {
+    if (appReady && initialRoute) {
+      router.replace(initialRoute as any);
+    }
+  }, [appReady, initialRoute]);
 
+  // Loading screen while deciding initial route
+  if (!appReady) {
+    return (
+      // <ThemeProvider value={theme}>
+      <ApLoader />
+      // </ThemeProvider>
+    );
+  }
+
+  // Render Slot (root navigator)
   return (
-    <ThemeProvider value={theme}>
-      <Slot />
-    </ThemeProvider>
+    // <ThemeProvider value={theme}>
+    <Slot />
+    // </ThemeProvider>
   );
 }
 

@@ -1,5 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 
 import ApHeader from "@/components/headers/header";
 import ApSafeAreaView from "@/components/safeAreaView/safeAreaView";
@@ -21,15 +27,6 @@ import {
 
 import { RootState, AppDispatch } from "@/redux/store";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback } from "react";
-
-// Network List
-const networks = [
-  { name: "MTN", logo: require("../../../assets/images/mtn.png") },
-  { name: "Airtel", logo: require("../../../assets/images/airtel.png") },
-  { name: "GLO", logo: require("../../../assets/images/glo.jpg") },
-  { name: "9mobile", logo: require("../../../assets/images/9mobile.jpeg") },
-];
 
 // Banner Images
 const banners = [
@@ -44,107 +41,103 @@ export default function DataPlanScreen() {
   const { showToast } = useToast();
 
   const [phone, setPhone] = useState("");
-  const [selectedNetwork, setSelectedNetwork] = useState(networks[0]);
-
+  const [selectedNetwork, setSelectedNetwork] = useState<{
+    name: string;
+    logo: any;
+  } | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("");
-
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [pinVisible, setPinVisible] = useState(false);
   const [pinCode, setPinCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [dataPlans, setDataPlans] = useState({});
+  const [plansLoading, setPlansLoading] = useState(false);
 
   const { user } = useSelector((state: RootState) => state.auth);
   const { plans, dataServices } = useSelector(
     (state: RootState) => state.easyAccessdataPlans
   );
 
-  // LOAD DATA SERVICES
+  // Load Data Services
   useFocusEffect(
     useCallback(() => {
       dispatch(getDataServices("data") as any);
     }, [dispatch])
   );
 
+  // Initialize default network and categories
   useEffect(() => {
     if (dataServices.length) {
-      // Default network: MTN
-      const defaultNetwork =
+      const defaultService =
         dataServices.find((s: any) => s.name.toLowerCase() === "mtn") ||
-        dataServices[0]; // fallback to first if MTN not found
+        dataServices[0];
 
-      setSelectedNetwork({
-        name: defaultNetwork.name,
-        logo: defaultNetwork.image || require("../../../assets/images/mtn.png"),
-      });
+      const defaultNetwork = {
+        name: defaultService.name,
+        logo: defaultService.image || require("../../../assets/images/mtn.png"),
+      };
 
-      // Fetch categories for default network
-      (async () => {
-        const result = await dispatch(
-          fetchDataCategories({
-            network: defaultNetwork.name.split(" ")[0],
-            serviceType: "data",
-          })
-        );
-
-        if (fetchDataCategories.fulfilled.match(result)) {
-          const cats = result.payload || [];
-          setCategories(cats);
-          const firstCategory = cats[0] || "";
-          setActiveTab(firstCategory);
-
-          // Fetch plans for default category
-          if (firstCategory) {
-            handleDataPlan(firstCategory);
-          }
-        } else {
-          showToast(result.payload || "Failed to fetch categories", "error");
-        }
-      })();
+      setSelectedNetwork(defaultNetwork);
+      loadCategoriesAndPlans(defaultNetwork);
     }
   }, [dataServices]);
 
-  const handleDataPlan = async (category: string) => {
+  // Load categories and plans for a network
+  const loadCategoriesAndPlans = async (network: { name: string }) => {
     try {
       const result = await dispatch(
-        fetchDataPlans({
-          network: selectedNetwork.name.split(" ")[0],
-          category,
+        fetchDataCategories({
+          network: network.name.split(" ")[0],
+          serviceType: "data",
         })
       );
 
-      console.log(selectedNetwork.name, category, "data type!");
+      if (fetchDataCategories.fulfilled.match(result)) {
+        const cats = result.payload || [];
+        setCategories(cats);
 
-      if (fetchDataPlans.fulfilled.match(result)) {
-        setDataPlans(result.payload as any);
+        const firstCategory = cats[0] || "";
+        setActiveTab(firstCategory);
+
+        if (firstCategory) {
+          fetchPlans(network.name, firstCategory);
+        }
       } else {
+        showToast(result.payload || "Failed to fetch categories", "error");
+      }
+    } catch (err) {
+      showToast("Error fetching categories", "error");
+    }
+  };
+
+  // Fetch plans based on network + category
+  const fetchPlans = async (networkName: string, category: string) => {
+    setPlansLoading(true);
+    try {
+      const result = await dispatch(
+        fetchDataPlans({ network: networkName.split(" ")[0], category })
+      );
+
+      if (!fetchDataPlans.fulfilled.match(result)) {
         showToast(result.payload || "Failed to fetch plans", "error");
       }
     } catch {
       showToast("Unexpected error while fetching plans", "error");
-    }
-  };
-  // When user selects a network
-  const handleNetworkSelect = async (net: (typeof networks)[0]) => {
-    setSelectedNetwork(net);
-    const result = await dispatch(
-      fetchDataCategories({
-        network: net.name.split(" ")[0],
-        serviceType: "data",
-      })
-    );
-
-    if (fetchDataCategories.fulfilled.match(result)) {
-      const cats = result.payload || [];
-      setCategories(cats);
-      setActiveTab(cats[0] || "");
-      handleDataPlan(activeTab);
+    } finally {
+      setPlansLoading(false);
     }
   };
 
-  // Submit Purchase
-  const handleFormSubmit = async (pinCode: string) => {
+  // Handle network selection
+  const handleNetworkSelect = async (network: { name: string; logo: any }) => {
+    setSelectedNetwork(network);
+    loadCategoriesAndPlans(network);
+  };
+
+  // Handle purchase submission
+  const handleFormSubmit = async (pin: string) => {
+    if (!selectedPlan || !selectedNetwork) return;
+
     const payload = {
       networkId: selectedNetwork.name.split(" ")[0].toLowerCase(),
       userId: user?._id,
@@ -152,7 +145,7 @@ export default function DataPlanScreen() {
       planId: selectedPlan._id,
       phone,
       amount: selectedPlan.ourPrice,
-      pinCode: pinCode,
+      pinCode: pin,
     };
 
     try {
@@ -160,7 +153,6 @@ export default function DataPlanScreen() {
       const resultAction = await dispatch(purchaseData(payload as any));
       if (purchaseData.fulfilled.match(resultAction)) {
         showToast("Data purchase successful!", "success");
-
         router.push({
           pathname: "/(protected)/history/[id]",
           params: { id: resultAction.payload.transactionId },
@@ -196,16 +188,18 @@ export default function DataPlanScreen() {
         />
 
         {/* Network Picker */}
-        <NetworkPhonePicker
-          selectedNetwork={selectedNetwork as any}
-          setSelectedNetwork={(net) => handleNetworkSelect(net as any)}
-          phone={phone}
-          setPhone={setPhone}
-          networks={dataServices.map((s: any) => ({
-            name: s.name,
-            image: s.image || require("../../../assets/images/mtn.png"),
-          }))}
-        />
+        {selectedNetwork && (
+          <NetworkPhonePicker
+            selectedNetwork={selectedNetwork as any}
+            setSelectedNetwork={handleNetworkSelect as any}
+            phone={phone}
+            setPhone={setPhone}
+            networks={dataServices.map((s: any) => ({
+              name: s.name,
+              image: s.image || require("../../../assets/images/mtn.png"),
+            }))}
+          />
+        )}
 
         {/* Category Tabs */}
         <View className="px-4 mt-6">
@@ -219,7 +213,7 @@ export default function DataPlanScreen() {
                 key={i}
                 onPress={() => {
                   setActiveTab(cat);
-                  handleDataPlan(activeTab);
+                  selectedNetwork && fetchPlans(selectedNetwork.name, cat);
                 }}
                 className="mr-6 pb-2"
               >
@@ -241,32 +235,42 @@ export default function DataPlanScreen() {
         </View>
 
         {/* Plans */}
-        <View className="px-4 mt-4 flex-row flex-wrap justify-between">
-          {plans.map((p, i) => (
-            <TouchableOpacity
-              key={i}
-              className="w-[32%] bg-gray-100 border border-gray-200 rounded-xl p-4 mb-4"
-              onPress={() => {
-                setSelectedPlan(p);
-                setPinVisible(true);
-              }}
-            >
-              <Text className="text-[20px] font-semibold text-center">
-                {p.name.match(/\d+(GB|MB)/i)?.[0]}
-              </Text>
+        {plansLoading ? (
+          <View className="px-4 mt-4 flex-row justify-center">
+            <ActivityIndicator size="large" color="#22c55e" />
+          </View>
+        ) : (
+          <View className="px-4 mt-4 flex-row flex-wrap justify-between">
+            {plans.map((p, i) => (
+              <TouchableOpacity
+                key={i}
+                className="w-[32%] bg-gray-100 border border-gray-200 rounded-xl p-4 mb-4"
+                onPress={() => {
+                  setSelectedPlan(p);
+                  setPinVisible(true);
+                }}
+              >
+                <Text className="text-[20px] font-semibold text-center">
+                  {p.name.match(/\d+(\.\d+)?(GB|MB)/i)?.[0]}
+                </Text>
+                <Text className="text-gray-600 text-sm mt-1 text-center bg-green-100 px-2 py-1 rounded-full">
+                  {p.validity}
+                </Text>
+                <Text className="text-green-600 font-semibold mt-1 text-center text-lg">
+                  ₦{p.ourPrice}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {/* Phantom views for alignment */}
+            {Array.from({ length: (3 - (plans.length % 3)) % 3 }).map(
+              (_, i) => (
+                <View key={`phantom-${i}`} className="w-[32%] mb-4" />
+              )
+            )}
+          </View>
+        )}
 
-              <Text className="text-gray-600 text-sm mt-1 text-center bg-green-100 px-2 py-1 rounded-full">
-                {p.validity}
-              </Text>
-
-              <Text className="text-green-600 font-semibold mt-1 text-center text-lg">
-                ₦{p.ourPrice}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* PIN MODAL */}
+        {/* PIN Modal */}
         <PinModal
           visible={pinVisible}
           onClose={() => setPinVisible(false)}

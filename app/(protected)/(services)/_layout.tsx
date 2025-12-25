@@ -12,13 +12,10 @@ export default function ServiceLayout() {
       router.replace("/(auth)/signin");
     }
   }, [token, user]);
-  // const { resetTimer } = useAutoLogout(10000);
 
   return (
     <>
-      {/* <TouchableWithoutFeedback onPress={resetTimer}> */}
       <Slot />
-      {/* </TouchableWithoutFeedback> */}
     </>
   );
 }

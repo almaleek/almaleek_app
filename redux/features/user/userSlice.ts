@@ -1,11 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import {
-  currentUser,
-  loginUser,
-  signUpUser,
-} from "./userThunk";
+import { currentUser, loginUser, signUpUser } from "./userThunk";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 
 import { User } from "./type";
 
@@ -16,7 +11,6 @@ interface AuthState {
   loading: boolean;
   error: string | null;
 }
-
 
 const initialState: AuthState = {
   user: null,
@@ -30,7 +24,10 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    setTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken: string }>) => {
+    setTokens: (
+      state,
+      action: PayloadAction<{ accessToken: string; refreshToken: string }>
+    ) => {
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
     },
@@ -66,12 +63,13 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
+
       .addCase(loginUser.fulfilled, (state, action: PayloadAction<any>) => {
         state.accessToken = action.payload.accessToken;
         state.refreshToken = action.payload.refreshToken;
         state.user = action.payload.user;
         state.loading = false;
-         AsyncStorage.setItem("accessToken", action.payload.accessToken);
+        AsyncStorage.setItem("accessToken", action.payload.accessToken);
         AsyncStorage.setItem("refreshToken", action.payload.refreshToken);
       })
       .addCase(loginUser.rejected, (state, action) => {

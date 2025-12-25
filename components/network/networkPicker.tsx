@@ -112,11 +112,20 @@ export default function NetworkPhonePicker({
       <Modal visible={contactModal} transparent animationType="slide">
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white max-h-[60%] p-4 rounded-t-3xl">
-            <Text className="text-lg font-semibold mb-3">Select Contact</Text>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-lg font-semibold ">Select Contact</Text>
+
+              <TouchableOpacity
+                className=" p-2 bg-red-200 rounded-lg"
+                onPress={() => setContactModal(false)}
+              >
+                <Text className="text-center">X</Text>
+              </TouchableOpacity>
+            </View>
 
             <FlatList
               data={contacts}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.id as any}
               renderItem={({ item }) => {
                 const number = item?.phoneNumbers?.[0]?.number;
                 if (!number) return null;
@@ -135,13 +144,6 @@ export default function NetworkPhonePicker({
                 );
               }}
             />
-
-            <TouchableOpacity
-              className="mt-3 p-3 bg-gray-200 rounded-xl"
-              onPress={() => setContactModal(false)}
-            >
-              <Text className="text-center">Close</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>

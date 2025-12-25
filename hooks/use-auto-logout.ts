@@ -5,13 +5,13 @@ import { useRouter, useNavigation } from "expo-router";
 export default function useAutoLogout(timeout = 60000) {
   const router = useRouter();
   const navigation = useNavigation();
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startTimer = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
 
     timerRef.current = setTimeout(() => {
-      router.replace("/(auth)/passcode");
+      router.replace("/(security)/passcode");
     }, timeout);
   };
 

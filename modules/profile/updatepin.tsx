@@ -10,9 +10,11 @@ import { Lock } from "lucide-react-native";
 import ApHeader from "@/components/headers/header";
 import ApTextInput from "@/components/textInput/textInput";
 import ApButton from "@/components/button/button";
+import { useToast } from "@/components/toast/toastProvider";
 
 export default function UpdatePinForm() {
   const dispatch = useDispatch<AppDispatch>();
+  const { showToast } = useToast();
 
   const initialValues = { oldpin: "", newpin: "" };
 
@@ -32,13 +34,13 @@ export default function UpdatePinForm() {
     try {
       const resultAction = await dispatch(updatePin(values));
       if (updatePin.fulfilled.match(resultAction)) {
-        alert("PIN updated successfully");
+        showToast("PIN updated successfully");
         resetForm();
       } else {
-        alert(resultAction.payload as string);
+        showToast(resultAction.payload as string, "error");
       }
     } catch (err) {
-      alert("Unexpected error. Please try again.");
+      showToast("Unexpected error. Please try again.", "error");
     }
   };
 
@@ -79,7 +81,7 @@ export default function UpdatePinForm() {
               placeholder="Enter new PIN"
               isPassword
               icon={<Lock size={20} />}
-              secureTextEntry
+              // secureTextEntry
             />
 
             {/* Submit */}

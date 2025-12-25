@@ -425,7 +425,7 @@ export default function ElectricityScreen() {
                         ₦{Number(amt).toLocaleString()}
                       </Text>
                       <Text
-                        className={`text-center text-xs ${
+                        className={`text-center text-xs text-green-600 ${
                           selectedAmount === amt
                             ? "text-black"
                             : "text-gray-500"

@@ -1,159 +1,232 @@
-import React, { useEffect } from "react";
-import { View, Text } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
 import { fetchTransactionById } from "@/redux/features/transaction/transactionSlice";
-import { CheckCircle, Clock, XCircle } from "lucide-react-native";
+import {
+  CheckCircle,
+  Clock,
+  XCircle,
+  Download,
+  Share2,
+} from "lucide-react-native";
 import ApScrollView from "@/components/scrollview/scrollview";
 import ApLoader from "@/components/loaders/mainloader";
 import ApSafeAreaView from "@/components/safeAreaView/safeAreaView";
 import ApHeader from "@/components/headers/header";
 
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { captureRef } from "react-native-view-shot";
+
 export default function TransactionPage() {
   const { id } = useLocalSearchParams();
   const dispatch = useDispatch<AppDispatch>();
+  const receiptRef = useRef<View>(null);
+  const [processing, setProcessing] = useState(false);
 
   const { transaction, loading } = useSelector(
     (state: RootState) => state.transactions
   );
 
-  // Fetch transaction on mount
   useEffect(() => {
-    if (id) {
-      dispatch(fetchTransactionById({ _id: id as string }));
-    }
+    if (id) dispatch(fetchTransactionById({ _id: id as string }));
   }, [dispatch, id]);
 
-  // Render each key-value pair
-  const RenderTrans = ({ title, name }: { title: string; name: string }) => (
-    <View className="flex-row justify-between py-1">
-      <Text className="font-semibold text-gray-800">{title}</Text>
-      <Text className="text-gray-700">{name}</Text>
-    </View>
-  );
-
-  // Render fields specific to service type
-  const renderServiceFields = () => {
-    if (!transaction) return null;
-
-    switch (transaction.service) {
-      case "wallet":
-        return <RenderTrans title="Transaction Type:" name={transaction.transaction_type || "N/A"} />;
-      case "airtime":
-        return (
-          <>
-            <RenderTrans title="Network:" name={transaction.network?.toUpperCase() || "N/A"} />
-            <RenderTrans title="Phone:" name={transaction.mobile_no || "N/A"} />
-          </>
-        );
-      case "data":
-        return (
-          <>
-            <RenderTrans title="Network:" name={transaction.network?.toUpperCase() || "N/A"} />
-            <RenderTrans title="Phone:" name={transaction.mobile_no || "N/A"} />
-            <RenderTrans title="Data Plan:" name={transaction.data_type || "N/A"} />
-          </>
-        );
-      case "electricity":
-        return (
-          <>
-            <RenderTrans title="Meter No:" name={transaction.meter_no || "N/A"} />
-            <RenderTrans title="Token:" name={transaction.token || "N/A"} />
-            <RenderTrans title="Customer:" name={transaction.customer_name || "N/A"} />
-          </>
-        );
-      case "exam_pin":
-        return <RenderTrans title="Pin:" name={transaction.waec_pin || "N/A"} />;
-      default:
-        return null;
-    }
-  };
-
-  // Show loader
   if (loading) return <ApLoader />;
 
-  // Handle missing transaction
-  if (!transaction) {
+  if (!transaction)
     return (
       <View className="flex-1 justify-center items-center bg-white">
         <Text className="text-gray-500">Transaction not found.</Text>
       </View>
     );
-  }
 
-  // Format currency
   const formatCurrency = (amount: number | undefined | null) =>
     amount != null ? `₦${Number(amount).toLocaleString()}` : "₦0";
 
+  // ---------------------- DOWNLOAD ONLY ----------------------
+  // const handleDownloadOnly = async () => {
+  //   if (!receiptRef.current) return;
+
+  //   try {
+  //     setProcessing(true);
+  //     const uri = await captureRef(receiptRef, { format: "png", quality: 0.9 });
+
+  //     const fileUri = `${FileSystem.cacheDirectory}Almaleek_Receipt_${transaction.reference_no}.png`;
+
+  //     await FileSystem.copyAsync({ from: uri, to: fileUri });
+
+  //     Alert.alert("Success", "Receipt downloaded successfully.");
+  //   } catch (error) {
+  //     Alert.alert("Error", "Unable to download receipt.");
+  //   } finally {
+  //     setProcessing(false);
+  //   }
+  // };
+
+  // ---------------------- SHARE ONLY ----------------------
+  const handleShareOnly = async () => {
+    if (!receiptRef.current) return;
+
+    try {
+      setProcessing(true);
+      const uri = await captureRef(receiptRef, { format: "png", quality: 0.9 });
+      await Sharing.shareAsync(uri, {
+        mimeType: "image/png",
+        dialogTitle: `Almaleek Receipt - ${transaction.reference_no}`,
+      });
+    } catch (error) {
+      Alert.alert("Error", "Unable to share receipt.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const RenderRow = ({ label, value }: { label: string; value: string }) => (
+    <View className="flex-row justify-between py-2 border-b border-gray-200">
+      <Text className="text-gray-600 font-medium">{label}</Text>
+      <Text className="text-gray-800 font-semibold">{value}</Text>
+    </View>
+  );
+
   return (
-      <ApSafeAreaView>
-      <ApHeader title="Transaction Details" link="/(protected)/(tabs)/history" />
-    <ApScrollView style={{ backgroundColor: "white", flex: 1 }}>
+    <ApSafeAreaView>
+      <ApHeader
+        title="Transaction Receipt"
+        link="/(protected)/(tabs)/history"
+      />
 
-      <View className=" bg-white p-6 rounded-xl shadow-lg">
-        {/* Status & service */}
-        <View className="items-center mb-4">
-          {transaction.status === "success" && (
-            <>
-              <CheckCircle size={48} color="green" />
-              <Text className="text-xl font-bold text-green-700 mt-2">
-                Transaction Successful
+      <ApScrollView style={{ backgroundColor: "#f5f5f5", flex: 1 }}>
+        <View className="p-4">
+          {/* RECEIPT CARD */}
+          <View
+            ref={receiptRef}
+            collapsable={false}
+            className="bg-white p-6 rounded-2xl shadow-lg mx-1"
+          >
+            {/* Status Icon */}
+            <View className="items-center mb-4">
+              {transaction.status === "success" && (
+                <CheckCircle size={52} color="green" />
+              )}
+              {transaction.status === "pending" && (
+                <Clock size={52} color="orange" />
+              )}
+              {transaction.status === "failed" && (
+                <XCircle size={52} color="red" />
+              )}
+              <Text className="mt-2 text-xl font-bold">
+                {transaction.status?.toUpperCase()}
               </Text>
-            </>
-          )}
-          {transaction.status === "pending" && (
-            <>
-              <Clock size={48} color="gold" />
-              <Text className="text-xl font-bold text-yellow-700 mt-2">
-                Transaction Pending
-              </Text>
-            </>
-          )}
-          {transaction.status === "failed" && (
-            <>
-              <XCircle size={48} color="red" />
-              <Text className="text-xl font-bold text-red-700 mt-2">
-                Transaction Failed
-              </Text>
-            </>
-          )}
+            </View>
 
-          <Text className="px-4 py-1 bg-gray-200 mt-3 rounded-full capitalize">
-            {transaction.service || "N/A"}
-          </Text>
+            {/* Transaction Fields */}
+            <RenderRow
+              label="Reference"
+              value={
+                transaction.client_reference ||
+                transaction.reference_no ||
+                "N/A"
+              }
+            />
+            <RenderRow
+              label="Amount"
+              value={formatCurrency(transaction.amount)}
+            />
+            <RenderRow
+              label="Date"
+              value={
+                transaction.transaction_date
+                  ? new Date(transaction.transaction_date).toLocaleString()
+                  : "N/A"
+              }
+            />
+            <RenderRow label="Service" value={transaction.service || "N/A"} />
 
-          <Text className="text-gray-600 text-center mt-3 px-6">
-            Thank you for choosing our service! We appreciate your trust.
-          </Text>
+            {/* CONDITIONAL FIELDS */}
+            {transaction.network && (
+              <RenderRow
+                label="Network"
+                value={transaction.network.toUpperCase()}
+              />
+            )}
+            {transaction.mobile_no && (
+              <RenderRow label="Phone" value={transaction.mobile_no} />
+            )}
+            {transaction.data_type && (
+              <RenderRow label="Plan" value={transaction.data_type} />
+            )}
+            {transaction.meter_no && (
+              <RenderRow label="Meter No" value={transaction.meter_no} />
+            )}
+            {transaction.token && (
+              <RenderRow label="Token" value={transaction.token} />
+            )}
+            {transaction.customer_name && (
+              <RenderRow label="Customer" value={transaction.customer_name} />
+            )}
+            {transaction.waec_pin && (
+              <RenderRow label="Pin" value={transaction.waec_pin} />
+            )}
+
+            <RenderRow
+              label="Previous Balance"
+              value={formatCurrency(transaction.previous_balance)}
+            />
+            <RenderRow
+              label="New Balance"
+              value={formatCurrency(transaction.new_balance)}
+            />
+
+            <Text className="text-center mt-4 text-gray-500 text-xs">
+              Thank you for choosing Almaleek 💚
+            </Text>
+          </View>
+
+          {/* ACTION BUTTONS */}
+          <View className="flex-row justify-center gap-4 mt-6">
+            {/* Download */}
+            {/* <TouchableOpacity
+              onPress={handleDownloadOnly}
+              disabled={processing}
+              className="flex-row items-center bg-green-700 px-6 py-3 rounded-xl"
+            >
+              {processing ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Download size={20} color="white" className="mr-2" />
+                  <Text className="text-white font-semibold">Download</Text>
+                </>
+              )}
+            </TouchableOpacity> */}
+
+            {/* Share */}
+            <TouchableOpacity
+              onPress={handleShareOnly}
+              disabled={processing}
+              className="flex-row items-center bg-blue-600 px-6 py-3 rounded-xl gap-4"
+            >
+              {processing ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Share2 size={20} color="white" className="mr-2" />
+                  <Text className="text-white font-semibold">Share</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-
-        {/* Transaction info */}
-        <View className="mt-4 space-y-3">
-          <RenderTrans
-            title="Reference:"
-            name={transaction.client_reference || transaction.reference_no || "N/A"}
-          />
-          <RenderTrans title="Amount:" name={formatCurrency(transaction.amount)} />
-          <RenderTrans
-            title="Date:"
-            name={
-              transaction.transaction_date
-                ? new Date(transaction.transaction_date).toLocaleString()
-                : "N/A"
-            }
-          />
-
-          {/* Service-specific fields */}
-          {renderServiceFields()}
-
-          <RenderTrans title="Previous Balance:" name={formatCurrency(transaction.previous_balance)} />
-          <RenderTrans title="New Balance:" name={formatCurrency(transaction.new_balance)} />
-        </View>
-      </View>
-    </ApScrollView>
-      </ApSafeAreaView>
-
-
+      </ApScrollView>
+    </ApSafeAreaView>
   );
 }

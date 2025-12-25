@@ -15,17 +15,16 @@ export default function ApSafeAreaView({ children }: AppSafeAreaProps) {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white-100"
+      className="flex-1 bg-white-300"
       style={{
         minHeight: height, // ensure full device height
         paddingBottom: insets.bottom,
         paddingLeft: insets.left,
         paddingRight: insets.right,
+        backgroundColor: "white",
       }}
     >
       <StatusBar barStyle="dark-content" />
-
-      {/* If you ever want to debug: console.log(height, width) */}
 
       <View
         className="flex-1 px-4"

@@ -9,9 +9,11 @@ import ApHeader from "@/components/headers/header";
 import ApTextInput from "@/components/textInput/textInput";
 import ApButton from "@/components/button/button";
 import { Lock } from "lucide-react-native";
+import { useToast } from "@/components/toast/toastProvider";
 
 export default function UpdatePassword() {
   const dispatch = useDispatch<AppDispatch>();
+  const { showToast } = useToast();
 
   const initialValues = {
     currentPassword: "",
@@ -33,13 +35,13 @@ export default function UpdatePassword() {
     try {
       const resultAction = await dispatch(updatePassword(values));
       if (updatePassword.fulfilled.match(resultAction)) {
-        alert("Password updated successfully");
+        showToast("Password updated successfully", "success");
         resetForm();
       } else {
-        alert(resultAction.payload as string);
+        showToast(resultAction.payload as string, "error");
       }
     } catch (err) {
-      alert("Unexpected error. Try again.");
+      showToast("Unexpected error. Try again.", "error");
     }
   };
 

@@ -1,11 +1,17 @@
 import React from "react";
-import { ScrollView, ViewStyle, Dimensions } from "react-native";
+import {
+  ScrollView,
+  ViewStyle,
+  Dimensions,
+  RefreshControlProps,
+} from "react-native";
 
 interface AppScrollViewProps {
   children: React.ReactNode;
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
   showsVerticalScrollIndicator?: boolean;
+  refreshControl?: React.ReactNode; // optional refreshControl
 }
 
 // Get screen height
@@ -16,6 +22,7 @@ export default function ApScrollView({
   style,
   contentContainerStyle,
   showsVerticalScrollIndicator = false,
+  refreshControl,
 }: AppScrollViewProps) {
   return (
     <ScrollView
@@ -23,13 +30,14 @@ export default function ApScrollView({
       contentContainerStyle={[
         {
           paddingVertical: 16,
-          minHeight: screenHeight, // 🔥 ensures full-screen height
+          minHeight: screenHeight, // ensures full-screen height
           flexGrow: 1,
           paddingBottom: 200,
         },
         contentContainerStyle,
       ]}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
+      refreshControl={refreshControl as any} // 🔥 optional support
     >
       {children}
     </ScrollView>

@@ -62,7 +62,7 @@ const ApHomeHeader = () => {
       {/* Right - Settings & Notifications */}
       <View className="flex-row items-center gap-2">
         <TouchableOpacity
-          onPress={() => router.push("/onboarding")}
+          onPress={() => router.push("/(protected)/(tabs)/profile")}
           className="bg-gray-100 p-2 rounded-full"
         >
           <Settings color="#374151" size={20} />

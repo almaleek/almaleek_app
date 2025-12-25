@@ -72,6 +72,7 @@ export default function PasscodeScreen() {
     if (nextAttempts >= MAX_ATTEMPTS) {
       Alert.alert("Too many attempts", "Please log in with your credentials");
       router.replace("/(auth)/signin");
+      console.log(pin, "sigin");
     } else {
       Alert.alert("Wrong PIN", "Please try again");
     }

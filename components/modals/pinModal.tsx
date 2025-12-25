@@ -1,5 +1,12 @@
-import React, { useState } from "react";
-import { Modal, View, Text, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  Pressable,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Lock } from "lucide-react-native";
 
@@ -10,8 +17,6 @@ type PinModalProps = {
   loading?: boolean;
 };
 
-import { ActivityIndicator } from "react-native";
-
 export default function PinModal({
   visible,
   onClose,
@@ -20,22 +25,19 @@ export default function PinModal({
 }: PinModalProps) {
   const [pin, setPin] = useState<string>("");
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!visible) setPin("");
   }, [visible]);
 
   const handlePress = (num: string) => {
-    if (pin.length >= 4 || loading) return; // prevent input while loading
+    if (pin.length >= 4 || loading) return;
     const newPin = pin + num;
     setPin(newPin);
-
-    if (newPin.length === 4) {
-      onSubmit(newPin);
-    }
+    if (newPin.length === 4) onSubmit(newPin);
   };
 
   const handleDelete = () => {
-    if (loading) return; // disable delete while loading
+    if (loading) return;
     setPin((prev) => prev.slice(0, -1));
   };
 
@@ -48,35 +50,35 @@ export default function PinModal({
 
   return (
     <Modal animationType="slide" transparent visible={visible}>
-      <View className="flex-1 bg-white/70 justify-end">
-        <View className="bg-green-50 rounded-t-3xl p-5 pb-10 relative">
+      <View className="flex-1 justify-end bg-black/30">
+        <View className="bg-white rounded-t-3xl p-6 pb-10 relative shadow-xl">
           {/* Header */}
-          <View className="flex-row justify-between items-center mb-4">
-            <View />
+          <View className="flex-row justify-end mb-4">
             <TouchableOpacity
               onPress={() => {
                 if (!loading) onClose();
                 setPin("");
               }}
+              className="p-2"
             >
-              <Ionicons name="close" size={22} color="black" />
+              <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
 
-          {/* Lock + Title */}
-          <View className="items-center mb-6 mt-2">
-            <Lock size={28} color="#32d47a" />
-            <Text className="text-green-600 text-base mt-2">
-              Transaction PIN
+          {/* Lock Icon & Title */}
+          <View className="items-center mb-6">
+            <Lock size={36} color="#32d47a" />
+            <Text className="text-green-600 font-semibold text-lg mt-2">
+              Enter Transaction PIN
             </Text>
 
             {/* PIN Dots */}
-            <View className="flex-row space-x-8 mt-4 gap-2">
+            <View className="flex-row mt-4 space-x-4">
               {[0, 1, 2, 3].map((i) => (
                 <View
                   key={i}
-                  className={`w-3 h-3 rounded-full ${
-                    pin.length > i ? "bg-[#32d47a]" : "bg-gray-500/40"
+                  className={`w-4 h-4 rounded-full ${
+                    pin.length > i ? "bg-green-500" : "bg-gray-300"
                   }`}
                 />
               ))}
@@ -85,43 +87,47 @@ export default function PinModal({
 
           {/* Keypad */}
           <View className="items-center">
-            <View className="w-full">
-              {keypad.map((row, rowIndex) => (
-                <View
-                  key={rowIndex}
-                  className="flex-row justify-between my-3 px-10"
-                >
-                  {row.map((item, idx) => {
-                    if (item === "")
-                      return <View key={idx} className="w-12 " />;
-                    if (item === "del")
-                      return (
-                        <TouchableOpacity key={idx} onPress={handleDelete}>
-                          <Text className="text-[#32d47a] text-lg font-semibold">
-                            Delete
-                          </Text>
-                        </TouchableOpacity>
-                      );
-
+            {keypad.map((row, rowIndex) => (
+              <View
+                key={rowIndex}
+                className="flex-row justify-between w-full px-10 my-2"
+              >
+                {row.map((item, idx) => {
+                  if (item === "") return <View key={idx} className="w-16" />;
+                  if (item === "del")
                     return (
-                      <TouchableOpacity
+                      <Pressable
                         key={idx}
-                        onPress={() => handlePress(item)}
+                        onPress={handleDelete}
+                        className="w-16 h-16 justify-center items-center bg-gray-100 rounded-full"
                       >
-                        <Text className="text-[#32d47a] rounded-full p-4 bg-white text-2xl font-semibold">
-                          {item}
-                        </Text>
-                      </TouchableOpacity>
+                        <Text className="text-green-600 font-semibold">⌫</Text>
+                      </Pressable>
                     );
-                  })}
-                </View>
-              ))}
-            </View>
+
+                  return (
+                    <Pressable
+                      key={idx}
+                      onPress={() => handlePress(item)}
+                      className="w-16 h-16 justify-center items-center bg-green-50 rounded-full shadow"
+                      android_ripple={{
+                        color: "rgba(50,212,122,0.3)",
+                        borderless: true,
+                      }}
+                    >
+                      <Text className="text-green-600 text-2xl font-bold">
+                        {item}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
 
-          {/* LOADING OVERLAY */}
+          {/* Loading Overlay */}
           {loading && (
-            <View className="absolute inset-0 bg-black/30 justify-center items-center rounded-t-3xl">
+            <View className="absolute inset-0 bg-black/25 justify-center items-center rounded-t-3xl">
               <ActivityIndicator size="large" color="#32d47a" />
             </View>
           )}

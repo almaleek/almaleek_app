@@ -162,10 +162,11 @@ export const handleVerifyTvSub = createAsyncThunk(
         "/easyaccess/verify-tvsub",
         payload
       );
+
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
-        error.response?.data?.msg || "TvSub verification failed"
+        error.response?.data?.error || "TvSub verification failed"
       );
     }
   }
@@ -179,11 +180,18 @@ export const purchaseTvSub = createAsyncThunk(
         "/easyaccess/purchase-tvsub",
         payload
       );
-      return response.data;
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.error || "Cable subscription failed"
-      );
+
+      return {
+        message: response.data.message,
+        transactionId: response.data.transactionId,
+      };
+    } catch (err: any) {
+      const errorData = err?.response?.data;
+      return rejectWithValue({
+        message: errorData?.message || "Purchase failed",
+        error: errorData.error,
+        transactionId: errorData?.transactionId || "",
+      });
     }
   }
 );
@@ -326,8 +334,6 @@ export const getCableServices = createAsyncThunk(
         };
       });
 
-      console.log(dataWithImages, "data");
-
       return dataWithImages;
     } catch (error: any) {
       return rejectWithValue(
@@ -351,8 +357,6 @@ export const getElectricityServices = createAsyncThunk(
           item.serviceId?.type?.toLowerCase() === "electricity" ||
           item.type?.toLowerCase() === "electricity"
       );
-
-      console.log(electricityServices, "electricity");
 
       // Map images for DisCos
       const serviceImages: Record<string, string> = {

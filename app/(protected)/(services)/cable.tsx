@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  TextInput,
 } from "react-native";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -16,7 +17,6 @@ import { ChevronRight } from "lucide-react-native";
 import ApSafeAreaView from "@/components/safeAreaView/safeAreaView";
 import ApScrollView from "@/components/scrollview/scrollview";
 import ApHeader from "@/components/headers/header";
-import ApTextInput from "@/components/textInput/textInput";
 import PinModal from "@/components/modals/pinModal";
 
 import { RootState } from "@/redux/store";
@@ -30,6 +30,7 @@ import {
 } from "@/redux/features/easyAccess/service";
 import { useToast } from "@/components/toast/toastProvider";
 import BannerCarousel from "@/components/carousel/banner";
+import { Ionicons } from "@expo/vector-icons";
 
 // Banner Images
 const banners = [
@@ -97,6 +98,7 @@ export default function CableScreen() {
   };
 
   const handleVerify = async (smartcardNumber: string) => {
+    console.log(smartCardNo, selectedProvider);
     setIsVerifying(true);
     try {
       const resultAction = await dispatch(
@@ -107,9 +109,13 @@ export default function CableScreen() {
       );
 
       if (handleVerifyTvSub.fulfilled.match(resultAction)) {
-        const { customerName } = resultAction.payload;
-        setCustomerDetails({ name: customerName || "N/A" });
-        setIsVerifying(true);
+        const content = resultAction.payload.message.content;
+        setCustomerDetails({
+          name: content.Customer_Name,
+          smartCard: content.Smartcard_Number,
+          balance: content.Balance,
+        });
+        setIsVerified(true);
         showToast("✅ Smart Card verified!", "success"); // ✅ Safe to call
       } else {
         showToast(resultAction.payload, "error");
@@ -155,7 +161,7 @@ export default function CableScreen() {
       userId: user?._id,
       planId: selectedPlan._id,
       smartCardNo,
-      phone: "07000000000",
+      phone: user?.mobile_no as any,
       amount: Number(selectedPlan.ourPrice),
       pinCode: pin,
     };
@@ -164,15 +170,26 @@ export default function CableScreen() {
       setLoading(true);
 
       const result = await dispatch(purchaseTvSub({ payload }));
-
       if (purchaseTvSub.fulfilled.match(result)) {
-        const { request_id } = result.payload;
+        const { transactionId } = result.payload;
         router.push({
           pathname: "/(protected)/history/[id]",
-          params: { id: request_id },
+          params: { id: transactionId },
         });
       } else {
-        showToast(result.payload || "Purchase failed!", "error");
+        const transactionId = result.payload?.transactionId;
+        if (transactionId) {
+          router.push({
+            pathname: "/(protected)/history/[id]",
+            params: { id: transactionId },
+          });
+        } else {
+          showToast(
+            result.payload?.error ||
+              "❌ TV Cable purchase failed. Please try again.",
+            "error"
+          );
+        }
       }
     } catch {
       showToast("Error processing subscription", "error");
@@ -204,11 +221,19 @@ export default function CableScreen() {
           autoplayInterval={4000}
         />
         <Formik initialValues={{ smartcard: "" }} onSubmit={() => {}}>
-          {({ setFieldValue, values }) => (
+          {({
+            handleChange,
+            handleBlur,
+            handleSubmit,
+            values,
+            errors,
+            touched,
+            setFieldValue,
+          }) => (
             <View>
               {/* Provider Selector */}
               <TouchableOpacity
-                className="p-4 border-b border-gray-300 rounded-xl flex-row gap-4 items-center mb-4"
+                className=" mt-4 p-3 mx-4 border border-gray-300 rounded-xl flex-row gap-4 items-center mb-2"
                 onPress={() => {
                   setProviderModal(true);
                   handleCategory(selectedProvider);
@@ -236,22 +261,58 @@ export default function CableScreen() {
                   <ChevronRight color="gray" />
                 </View>
               </TouchableOpacity>
-              <ApTextInput
-                label="SmartCard Number"
-                name="smartcard"
-                placeholder="Enter Your SmartCard Number"
-                value={smartCardNo}
-                loading={isVerifying} // <-- control this from parent
-                onChange={(value: any) => {
-                  setSmartCardNo(value);
-                  setFieldValue("smartcard", value);
 
-                  if (value.length === 10) {
-                    setIsVerifying(true);
-                    handleVerify(value).finally(() => setIsVerifying(false));
-                  }
+              <View className="mx-4 mt-4">
+                <Text className="text-gray-500 mb-1">SmartCard Number</Text>
+
+                <View className="flex-row items-center border border-gray-300 rounded-xl px-3">
+                  <TextInput
+                    value={values.smartcard}
+                    onChangeText={handleChange("smartcard")}
+                    onBlur={handleBlur("smartcard")}
+                    keyboardType="numeric"
+                    placeholder="Enter meter number"
+                    className="flex-1 py-3 text-lg"
+                  />
+                  <Ionicons name="flash-outline" size={22} color="gray" />
+                </View>
+                {touched.smartcard && errors.smartcard && (
+                  <Text className="text-red-500 text-xs mt-1">
+                    {errors.smartcard}
+                  </Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                className="mx-4 mt-3 bg-green-600 p-3 rounded-xl"
+                onPress={() => {
+                  if (!values.smartcard)
+                    return showToast("Enter SmartCard number", "error");
+                  setSmartCardNo(values.smartcard);
+                  setIsVerifying(true);
+                  handleVerify(values.smartcard).finally(() =>
+                    setIsVerifying(false)
+                  );
                 }}
-              />
+              >
+                <Text className="text-center text-white font-semibold">
+                  {isVerifying ? "Checking..." : "Verify SmartCard"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Customer details after verification */}
+              {isVerified && customerDetails.name && (
+                <View className="mx-4 mt-4 p-3 bg-green-50 rounded-xl">
+                  <Text className="font-semibold text-md text-gray-600">
+                    Name: {customerDetails.name}
+                  </Text>
+                  <Text className="text-gray-600 text-sm mt-1">
+                    {customerDetails.balance
+                      ? `Balance: ${customerDetails.balance}`
+                      : null}
+                  </Text>
+                </View>
+              )}
 
               {/* Tabs */}
               <View className="px-4 mt-6">
@@ -295,7 +356,7 @@ export default function CableScreen() {
                     }}
                     className="w-[32%] bg-gray-100 border border-gray-200 rounded-xl p-4 mb-4"
                   >
-                    <Text className="text-[10px] font-semibold  text-center">
+                    <Text className="text-[15px] font-semibold  text-center">
                       {p?.name}
                     </Text>
                     <Text className="text-gray-600 text-sm mt-1 text-center bg-green-100 px-2 py-1 rounded-full">

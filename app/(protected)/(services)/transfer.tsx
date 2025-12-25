@@ -29,9 +29,9 @@ export default function ComingSoon() {
             {"\n"}Stay tuned!
           </Text>
 
-          <View className="absolute bottom-10">
+          <View className="absolute bottom-20">
             <Text className="text-gray-400 text-sm">
-              © {new Date().getFullYear()} Your App Name
+              © {new Date().getFullYear()} Almaleek
             </Text>
           </View>
         </View>

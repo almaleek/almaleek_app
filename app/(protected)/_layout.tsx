@@ -1,21 +1,7 @@
-import { Slot, useRouter } from "expo-router";
-import { useSelector } from "react-redux";
-import { useEffect } from "react";
+import { Slot } from "expo-router";
+import useAutoLogout from "@/hooks/use-auto-logout";
 
 export default function ProtectedLayout() {
-  const router = useRouter();
-  const token = useSelector((state: any) => state.auth.accessToken);
-  const user = useSelector((state: any) => state.auth.user);
-
-  useEffect(() => {
-    if (!token || !user) {
-      router.replace("/(auth)/signin");
-    }
-  }, [token, user]);
-
-  return (
-    <>
-      <Slot />
-    </>
-  );
+  useAutoLogout(180000);
+  return <Slot />;
 }

@@ -17,6 +17,8 @@ import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/redux/store";
 import { signUpUser } from "@/redux/features/user/userThunk";
 import { useToast } from "@/components/toast/toastProvider";
+import ApKeyboardWrapper from "@/components/keypardWrapper/keypardWrapper";
+import ApSafeAreaView from "@/components/safeAreaView/safeAreaView";
 
 const validationSchema = Yup.object({
   firstName: Yup.string()
@@ -65,147 +67,146 @@ export default function SignupForm() {
       showToast("🎉 Sign-up successful! Redirecting...", "success");
       router.push("/(auth)/signin");
     } else {
-      showToast(`❌ ${resultAction.payload || "Signup failed"}`);
+      showToast(resultAction.payload || "Signup failed", "error");
     }
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={{ flexGrow: 1 }}
-      className="bg-white p-6"
-    >
-      <Formik
-        initialValues={{
-          firstName: "",
-          lastName: "",
-          email: "",
-          state: "",
-          phone: "",
-          password: "",
-          confirmPassword: "",
-          referralCode: "",
-          pinCode: "",
-        }}
-        validationSchema={validationSchema}
-        onSubmit={handleSubmit}
-      >
-        {({ handleSubmit, isSubmitting }) => (
-          <View className="flex-1 justify-center ">
-            {/* Logo + Title */}
-            <View className="items-center mb-10 ">
-              <Image
-                source={require("@/assets/images/logo.png")} // replace with your logo
-                className="w-24 h-24"
-                resizeMode="contain"
-              />
-              <Text className="mt-4 text-2xl font-bold text-gray-800">
-                Create Account
-              </Text>
-              <Text className="text-gray-500 mt-1 text-center">
-                Fill in the details to get started
-              </Text>
+    <ApSafeAreaView>
+      <ApKeyboardWrapper>
+        <Formik
+          initialValues={{
+            firstName: "",
+            lastName: "",
+            email: "",
+            state: "",
+            phone: "",
+            password: "",
+            confirmPassword: "",
+            referralCode: "",
+            pinCode: "",
+          }}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+        >
+          {({ handleSubmit, isSubmitting }) => (
+            <View className="flex-1 justify-center ">
+              {/* Logo + Title */}
+              <View className="items-center mb-10 ">
+                <Image
+                  source={require("@/assets/images/logo.png")} // replace with your logo
+                  className="w-24 h-24"
+                  resizeMode="contain"
+                />
+                <Text className="mt-4 text-2xl font-bold text-gray-800">
+                  Create Account
+                </Text>
+                <Text className="text-gray-500 mt-1 text-center">
+                  Fill in the details to get started
+                </Text>
+              </View>
+
+              {/* Step 1: Personal Info */}
+              {step === 1 && (
+                <>
+                  <ApTextInput
+                    name="firstName"
+                    label="First Name"
+                    placeholder="Enter your first name"
+                    icon={<User size={20} />}
+                  />
+                  <ApTextInput
+                    name="lastName"
+                    label="Last Name"
+                    placeholder="Enter your last name"
+                    icon={<User size={20} />}
+                  />
+                  <ApTextInput
+                    name="email"
+                    label="Email"
+                    placeholder="Enter your email"
+                    icon={<Mail size={20} />}
+                    keyboardType="email-address"
+                  />
+                  <ApTextInput
+                    name="state"
+                    label="State"
+                    placeholder="Enter your state"
+                  />
+                  <ApTextInput
+                    name="phone"
+                    label="Phone Number"
+                    placeholder="Enter your phone number"
+                    keyboardType="phone-pad"
+                  />
+                  <ApButton
+                    variant="primary"
+                    title="Next"
+                    onPress={() => setStep(2)}
+                    // className="mt-4"
+                  />
+
+                  <View className="mt-6 flex-row justify-center">
+                    <Text className="text-gray-500">
+                      You already have an account?{" "}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        router.push("/(auth)/signin");
+                      }}
+                    >
+                      <Text className="text-blue-600 font-medium">Sign In</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {/* Step 2: Security Info */}
+              {step === 2 && (
+                <>
+                  <ApTextInput
+                    name="password"
+                    label="Password"
+                    placeholder="Enter your password"
+                    isPassword
+                    icon={<Lock size={20} />}
+                  />
+                  <ApTextInput
+                    name="confirmPassword"
+                    label="Confirm Password"
+                    placeholder="Confirm your password"
+                    isPassword
+                    icon={<Lock size={20} />}
+                  />
+                  <ApTextInput
+                    name="referralCode"
+                    label="Referral Code (Optional)"
+                    placeholder="Enter referral code"
+                  />
+                  <ApTextInput
+                    name="pinCode"
+                    label="PIN Code"
+                    placeholder="Enter 4-digit PIN"
+                    keyboardType="numeric"
+                  />
+                  <View className="flex-row justify-between mt-4">
+                    <ApButton
+                      title="Back"
+                      variant="secondary"
+                      onPress={() => setStep(1)}
+                    />
+                    <ApButton
+                      title="Sign Up"
+                      loading={isSubmitting}
+                      onPress={handleSubmit as any}
+                    />
+                  </View>
+                </>
+              )}
             </View>
-
-            {/* Step 1: Personal Info */}
-            {step === 1 && (
-              <>
-                <ApTextInput
-                  name="firstName"
-                  label="First Name"
-                  placeholder="Enter your first name"
-                  icon={<User size={20} />}
-                />
-                <ApTextInput
-                  name="lastName"
-                  label="Last Name"
-                  placeholder="Enter your last name"
-                  icon={<User size={20} />}
-                />
-                <ApTextInput
-                  name="email"
-                  label="Email"
-                  placeholder="Enter your email"
-                  icon={<Mail size={20} />}
-                  keyboardType="email-address"
-                />
-                <ApTextInput
-                  name="state"
-                  label="State"
-                  placeholder="Enter your state"
-                />
-                <ApTextInput
-                  name="phone"
-                  label="Phone Number"
-                  placeholder="Enter your phone number"
-                  keyboardType="phone-pad"
-                />
-                <ApButton
-                  variant="primary"
-                  title="Next"
-                  onPress={() => setStep(2)}
-                  // className="mt-4"
-                />
-
-                <View className="mt-6 flex-row justify-center">
-                  <Text className="text-gray-500">
-                    You already have an account?{" "}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      router.push("/(auth)/signin");
-                    }}
-                  >
-                    <Text className="text-blue-600 font-medium">Sign In</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {/* Step 2: Security Info */}
-            {step === 2 && (
-              <>
-                <ApTextInput
-                  name="password"
-                  label="Password"
-                  placeholder="Enter your password"
-                  isPassword
-                  icon={<Lock size={20} />}
-                />
-                <ApTextInput
-                  name="confirmPassword"
-                  label="Confirm Password"
-                  placeholder="Confirm your password"
-                  isPassword
-                  icon={<Lock size={20} />}
-                />
-                <ApTextInput
-                  name="referralCode"
-                  label="Referral Code (Optional)"
-                  placeholder="Enter referral code"
-                />
-                <ApTextInput
-                  name="pinCode"
-                  label="PIN Code"
-                  placeholder="Enter 4-digit PIN"
-                  keyboardType="numeric"
-                />
-                <View className="flex-row justify-between mt-4">
-                  <ApButton
-                    title="Back"
-                    variant="secondary"
-                    onPress={() => setStep(1)}
-                  />
-                  <ApButton
-                    title="Sign Up"
-                    loading={isSubmitting}
-                    onPress={handleSubmit as any}
-                  />
-                </View>
-              </>
-            )}
-          </View>
-        )}
-      </Formik>
-    </ScrollView>
+          )}
+        </Formik>
+      </ApKeyboardWrapper>
+    </ApSafeAreaView>
   );
 }

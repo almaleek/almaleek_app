@@ -59,15 +59,15 @@ const networks = [
 
 // QUICK AMOUNT BUTTONS
 const amounts = [
-  { value: 100, cashback: "₦1 Cashback" },
-  { value: 200, cashback: "₦2 Cashback" },
-  { value: 500, cashback: "₦5 Cashback" },
-  { value: 1000, cashback: "₦10 Cashback" },
-  { value: 2000, cashback: "₦20 Cashback" },
-  { value: 3000, cashback: "₦20 Cashback" },
-  { value: 5000, cashback: "₦50 Cashback" },
-  { value: 7000, cashback: "₦70 Cashback" },
-  { value: 10000, cashback: "₦100 Cashback" },
+  { value: 100, cashback: "₦2 Cashback" },
+  { value: 200, cashback: "₦4 Cashback" },
+  { value: 500, cashback: "₦10 Cashback" },
+  { value: 1000, cashback: "₦20 Cashback" },
+  { value: 2000, cashback: "₦40 Cashback" },
+  { value: 3000, cashback: "₦80 Cashback" },
+  { value: 5000, cashback: "₦160 Cashback" },
+  { value: 7000, cashback: "₦320 Cashback" },
+  { value: 10000, cashback: "₦640 Cashback" },
 ];
 
 // FORM VALIDATION
@@ -79,9 +79,6 @@ const schema = Yup.object().shape({
   phone: Yup.string()
     .matches(/^0[7-9][0-1]\d{8}$/, "Enter a valid 11-digit phone number")
     .required("Phone number is required"),
-  // pinCode: Yup.string()
-  //   .length(4, "PIN must be 4 digits")
-  //   .required("PIN is required"),
 });
 
 export default function AirtimeScreen() {
@@ -127,10 +124,12 @@ export default function AirtimeScreen() {
 
     const payload = {
       ...values,
-      networkId: selectedNetwork.name,
+      networkId: selectedNetwork.name.replace(/\s+.*/, "").toUpperCase(),
       userId: user?._id,
       amount: Number(values.amount),
     };
+
+    console.log(payload);
 
     try {
       const result = await dispatch(purchaseAirtime(payload as any));
@@ -208,12 +207,15 @@ export default function AirtimeScreen() {
                           ? "bg-green-100 border-green-500"
                           : "bg-gray-50 border-gray-200"
                       }`}
-                      onPress={() => setFieldValue("amount", item.value)}
+                      onPress={() => {
+                        setFieldValue("amount", item.value),
+                          setPinVisible(true);
+                      }}
                     >
                       <Text className="text-xs text-green-600 text-center">
                         {item.cashback}
                       </Text>
-                      <Text className="text-lg font-semibold mt-2 text-center">
+                      <Text className="text-[1.4rem] font-semibold mt-2 text-center">
                         ₦{item.value}
                       </Text>
                     </TouchableOpacity>
