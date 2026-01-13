@@ -4,6 +4,7 @@ import transactionReducer from "./features/transaction/transactionSlice";
 import walletReducer from "./features/wallet/walletSlice";
 import notificationReducer from "./features/notifications/notificationSlice";
 import easyAccessdataPlansReducer from "./features/easyAccess/service"; // Assuming you have this reducer imported
+import remitaReducer from "./features/remita/remitaSlice";
 
 // Combine reducers
 const rootReducer = combineReducers({
@@ -12,6 +13,7 @@ const rootReducer = combineReducers({
   wallets: walletReducer,
   notifications: notificationReducer,
   easyAccessdataPlans: easyAccessdataPlansReducer, // Assuming you have this reducer imported
+  remita: remitaReducer,
 });
 
 // Create store

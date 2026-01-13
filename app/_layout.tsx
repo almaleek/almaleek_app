@@ -1,33 +1,26 @@
-import { Slot, useRouter } from "expo-router";
-import { Provider, useDispatch, useSelector } from "react-redux";
-import { store } from "@/redux/store";
-import {
-  ThemeProvider,
-  DarkTheme,
-  DefaultTheme,
-} from "@react-navigation/native";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import React, { useEffect, useMemo, useState } from "react";
+
+
+import React, { useEffect,useState } from "react";
 import "../global.css";
 import { ToastProvider } from "@/components/toast/toastProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { setTokens, logout } from "@/redux/features/user/userSlice";
+
 import ApLoader from "@/components/loaders/mainloader";
 import { injectLogoutHandler } from "@/redux/apis/common/aixosInstance";
 
+import { useRouter, useRootNavigationState, Slot } from "expo-router";
+import { Provider, useDispatch } from "react-redux";
+import { store } from "@/redux/store";
+
 function AppContent() {
-  const colorScheme = useColorScheme();
   const dispatch = useDispatch();
   const router = useRouter();
 
   const [appReady, setAppReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
 
-  const theme = useMemo(
-    () => (colorScheme === "dark" ? DefaultTheme : DarkTheme),
-    [colorScheme]
-  );
-
+ 
   useEffect(() => {
     injectLogoutHandler(() => {
       dispatch(logout());
@@ -77,20 +70,19 @@ function AppContent() {
     }
   }, [appReady, initialRoute]);
 
+
+
   // Loading screen while deciding initial route
   if (!appReady) {
     return (
-      // <ThemeProvider value={theme}>
       <ApLoader />
-      // </ThemeProvider>
     );
   }
 
   // Render Slot (root navigator)
   return (
-    // <ThemeProvider value={theme}>
     <Slot />
-    // </ThemeProvider>
+   
   );
 }
 
