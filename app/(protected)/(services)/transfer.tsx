@@ -28,6 +28,8 @@ import {
 import { Search, ChevronDown, CheckCircle, XCircle } from "lucide-react-native";
 import MainLoader from "@/components/loaders/mainloader";
 import { router } from "expo-router";
+import BannerCarousel from "@/components/carousel/banner";
+import PinModal from "@/components/modals/pinModal";
 
 const TransferSchema = Yup.object().shape({
   bankCode: Yup.string().required("Bank is required"),
@@ -39,6 +41,13 @@ const TransferSchema = Yup.object().shape({
     .required("Amount is required"),
   narration: Yup.string().required("Narration is required"),
 });
+
+const banners = [
+  require("../../../assets/images/banner1.png"),
+  require("../../../assets/images/banner2.png"),
+  require("../../../assets/images/banner3.png"),
+];
+
 
 export default function TransferScreen() {
   const dispatch = useDispatch<AppDispatch>();
@@ -52,13 +61,17 @@ export default function TransferScreen() {
     transferResult,
     transferError,
   } = useSelector((state: RootState) => state.remita);
+  const { user } = useSelector((state: RootState) => state.auth);
 
   const [bankModalVisible, setBankModalVisible] = useState(false);
   const [selectedBank, setSelectedBank] = useState<any>(null);
   const [searchText, setSearchText] = useState("");
+  const [showAccountBankMatches, setShowAccountBankMatches] = useState(false);
   const handledOnceRef = useRef(false);
   const enquiryDebounceRef = useRef<any>(null);
   const [step, setStep] = useState<1 | 2>(1);
+  const [pinVisible, setPinVisible] = useState(false);
+  const [pinCode, setPinCode] = useState("");
   const amountlists = [
     { label: "₦1,000", value: "1000" },
     { label: "₦2,000", value: "2000" },
@@ -79,17 +92,34 @@ export default function TransferScreen() {
   useEffect(() => {
     if (transferResult && !handledOnceRef.current) {
       handledOnceRef.current = true;
-      Alert.alert("Success", "Transfer initiated successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            handledOnceRef.current = false;
-            dispatch(clearTransfer());
-            dispatch(clearEnquiry());
-            router.back();
-          },
-        },
-      ]);
+      try {
+        const res: any = transferResult || {};
+        const txId =
+          res?.transactionId ||
+          res?.data?.transactionId ||
+          res?.request_id ||
+          res?.data?.request_id ||
+          res?._id ||
+          res?.data?._id ||
+          res?.id ||
+          res?.data?.id;
+
+        if (txId) {
+          router.push({
+            pathname: "/(protected)/history/[id]",
+            params: { id: String(txId) },
+          });
+        } else {
+          Alert.alert("Success", "Transfer initiated successfully!");
+          router.back();
+        }
+      } finally {
+        handledOnceRef.current = false;
+        dispatch(clearTransfer());
+        dispatch(clearEnquiry());
+        setPinVisible(false);
+        setPinCode("");
+      }
     } else if (transferError && !handledOnceRef.current) {
       handledOnceRef.current = true;
       Alert.alert("Error", transferError?.message || "Transfer failed");
@@ -99,12 +129,25 @@ export default function TransferScreen() {
   }, [transferResult, transferError, dispatch]);
 
   const bankList = Array.isArray(banks) ? banks : [];
-  const filteredBanks = bankList.filter((bank: any) =>
-    bank.bankName.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredBanks = bankList.filter((bank: any) => {
+    const term = searchText.toLowerCase();
+    return (
+      bank.bankName.toLowerCase().includes(term) ||
+      String(bank.bankCode).toLowerCase().includes(term)
+    );
+  });
 
   const handleAccountChange = (text: string, setFieldValue: any, values: any) => {
     setFieldValue("accountNumber", text);
+    const prefix = text && text.length >= 3 ? text.slice(0, 3) : "";
+    if (prefix.length === 3) {
+      const hasMatch = bankList.some((bank: any) =>
+        String(bank.bankCode).startsWith(prefix)
+      );
+      setShowAccountBankMatches(hasMatch);
+    } else {
+      setShowAccountBankMatches(false);
+    }
     if (enquiryDebounceRef.current) {
       clearTimeout(enquiryDebounceRef.current);
     }
@@ -135,6 +178,8 @@ export default function TransferScreen() {
       amount: Number(values.amount),
       transactionDescription: values.narration,
       paymentIdentifier: `TXN-${Date.now()}`, // Generate a unique ID
+      userId: user?._id,
+      pinCode,
     };
 
     dispatch(initiateTransfer(payload));
@@ -168,10 +213,56 @@ export default function TransferScreen() {
                 errors,
                 touched,
                 setFieldValue,
-              }) => (
+              }) => {
+                const accountPrefix =
+                  values.accountNumber && values.accountNumber.length >= 3
+                    ? values.accountNumber.slice(0, 3)
+                    : "";
+                const accountBankMatches =
+                  accountPrefix.length === 3
+                    ? bankList.filter((bank: any) =>
+                        String(bank.bankCode).startsWith(accountPrefix)
+                      )
+                    : [];
+
+                return (
                 <View>
                   {step === 1 && (
                     <>
+                      <ApTextInput
+                        name="accountNumber"
+                        label="Account Number"
+                        placeholder="Enter 10-digit account number"
+                        keyboardType="numeric"
+                        maxLength={10}
+                        onChange={(text) =>
+                          handleAccountChange(text, setFieldValue, values)
+                        }
+                        loading={enquiryLoading}
+                      />
+                      {accountBankMatches.length > 0 && showAccountBankMatches && (
+                        <View className="mb-3 border border-gray-200 rounded-lg bg-white max-h-48">
+                          {accountBankMatches.map((item: any) => (
+                            <TouchableOpacity
+                              key={item.bankCode}
+                              className="px-3 py-2 border-b border-gray-100"
+                              onPress={() => {
+                                setSelectedBank(item);
+                                setFieldValue("bankCode", item.bankCode);
+                                setShowAccountBankMatches(false);
+                              }}
+                            >
+                              <Text className="text-gray-900">
+                                {item.bankName}
+                              </Text>
+                              <Text className="text-gray-500 text-xs">
+                                Code: {item.bankCode}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+
                       <Text className="mb-1 text-gray-700 font-semibold">Bank</Text>
                       <TouchableOpacity
                         onPress={() => setBankModalVisible(true)}
@@ -192,18 +283,6 @@ export default function TransferScreen() {
                         </Text>
                       )}
 
-                      <ApTextInput
-                        name="accountNumber"
-                        label="Account Number"
-                        placeholder="Enter 10-digit account number"
-                        keyboardType="numeric"
-                        maxLength={10}
-                        onChange={(text) =>
-                          handleAccountChange(text, setFieldValue, values)
-                        }
-                        loading={enquiryLoading}
-                      />
-
                       {enquiryResult && (
                         <View className="bg-green-50 p-3 rounded-lg mb-4 flex-row items-center border border-green-200">
                           <CheckCircle size={20} color="#16a34a" />
@@ -221,7 +300,6 @@ export default function TransferScreen() {
                           </Text>
                         </View>
                       )}
-
 
                       <ApButton
                         title="Continue"
@@ -243,22 +321,20 @@ export default function TransferScreen() {
                         </Text>
                       </View>
 
-                      <FlatList
-                        data={amountlists}
-                        keyExtractor={(item) => item.label}
-                        numColumns={4}
-                        columnWrapperStyle={{ justifyContent: "space-between", marginBottom: 8 }}
-                        renderItem={({ item }) => {
+                      <View className="flex-row flex-wrap justify-between mb-2">
+                        {amountlists.map((item) => {
                           const isSelected =
                             values.amount?.toString() === item.value &&
                             item.value !== "";
                           return (
                             <TouchableOpacity
-                              className={`flex-1 mx-1 rounded-full px-3 py-2 border items-center ${
+                              key={item.label}
+                              className={`rounded-full px-3 py-2 border items-center mb-2 ${
                                 isSelected
                                   ? "bg-green-100 border-green-500"
                                   : "bg-gray-100 border-gray-300"
                               }`}
+                              style={{ minWidth: "22%", alignItems: "center" }}
                               onPress={() => setFieldValue("amount", item.value)}
                               disabled={transferLoading || enquiryLoading}
                             >
@@ -271,8 +347,8 @@ export default function TransferScreen() {
                               </Text>
                             </TouchableOpacity>
                           );
-                        }}
-                      />
+                        })}
+                      </View>
 
                       <ApTextInput
                         name="amount"
@@ -289,7 +365,13 @@ export default function TransferScreen() {
 
                       <ApButton
                         title="Send"
-                        onPress={() => handleSubmit()}
+                        onPress={() => {
+                          if (!enquiryResult) {
+                            Alert.alert("Error", "Please verify account details first");
+                            return;
+                          }
+                          setPinVisible(true);
+                        }}
                         loading={transferLoading}
                         disabled={!enquiryResult || enquiryLoading || transferLoading}
                       />
@@ -316,7 +398,18 @@ export default function TransferScreen() {
                             placeholder="Search bank"
                             className="ml-2 flex-1 text-base"
                             value={searchText}
-                            onChangeText={setSearchText}
+                            onChangeText={(newText) => {
+                              setSearchText(newText);
+                              const match = bankList.find(
+                                (b: any) =>
+                                  String(b.bankCode).toLowerCase() === newText.toLowerCase()
+                              );
+                              if (match) {
+                                setSelectedBank(match);
+                                setFieldValue("bankCode", match.bankCode);
+                                setBankModalVisible(false);
+                              }
+                            }}
                             autoFocus
                           />
                         </View>
@@ -348,13 +441,33 @@ export default function TransferScreen() {
                       />
                     </View>
                   </Modal>
+
+                  <PinModal
+                    visible={pinVisible}
+                    loading={transferLoading}
+                    onClose={() => {
+                      if (!transferLoading) setPinVisible(false);
+                    }}
+                    onSubmit={(pin) => {
+                      setPinCode(pin);
+                      setPinVisible(false);
+                      handleSubmit();
+                    }}
+                  />
                 </View>
-              )}
+              )}}
             </Formik>
 
           </View>
+           <BannerCarousel
+          images={banners}
+          heightRatio={0.25}
+          borderRadius={16}
+          autoplayInterval={4000}
+        />
         </ApScrollView>
       )}
+
     </ApSafeAreaView>
   );
 }

@@ -43,7 +43,7 @@ export default function WalletCard({
       </Text>
 
       {/* Bonus / Claim section */}
-      <View className="flex flex-row justify-between gap-3 mt-2">
+      {/* <View className="flex flex-row justify-between gap-3 mt-2">
         <View className="bg-white/20 rounded-lg px-4 py-2 flex-row items-center gap-2">
           <TrendingUp size={14} color="white" />
           <Text className="text-white text-sm">
@@ -54,7 +54,7 @@ export default function WalletCard({
           <TrendingUp size={14} color="white" />
           <Text className="text-white text-sm">Claim: ₦0.00</Text>
         </View>
-      </View>
+      </View> */}
 
       {/* PalmPay account details */}
       <View className="bg-white/10 rounded-lg p-3 mt-4">

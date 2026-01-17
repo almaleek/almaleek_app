@@ -22,10 +22,10 @@ import ApButton from "@/components/button/button";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
 import {
-  getElectricityServices,
-  handleVerifyMeter,
-  purchaseElectricity,
-} from "@/redux/features/easyAccess/service";
+  fetchElectricityProviders,
+  validateElectricityMeter,
+  vendElectricity,
+} from "@/redux/features/remita/remitaSlice";
 import { electricityLogos } from "@/constants/eletricitylog";
 import { useToast } from "@/components/toast/toastProvider";
 import { useRouter } from "expo-router";
@@ -84,14 +84,19 @@ export default function ElectricityScreen() {
   };
 
   // Redux
-  const { electricityServices } = useSelector(
-    (state: RootState) => state.easyAccessdataPlans
-  );
+  const {
+    electricityProviders,
+    electricityProvidersLoading,
+    meterValidationResult,
+    meterValidationLoading,
+    vendResult,
+    vendLoading,
+  } = useSelector((state: RootState) => state.remita);
   const { user } = useSelector((state: RootState) => state.auth);
 
   // Load providers once
   useEffect(() => {
-    dispatch(getElectricityServices());
+    dispatch(fetchElectricityProviders());
   }, [dispatch]);
 
   const formatProvider = (prov: string) =>
@@ -131,37 +136,30 @@ export default function ElectricityScreen() {
     setLoading(true);
     try {
       const payload = {
-        company: formatProviderName(values.company || selectedProvider?.name),
-        metertype: values.metertype || selectedTab,
-        meterno: values.meterno,
-        phone: values.phone || "",
-        amount: values.amount || "",
+        discoCode: selectedProvider?.code || "",
+        meterType: (values.metertype || selectedTab).toLowerCase() === "prepaid" ? "01" : "02",
+        meterNumber: values.meterno,
       };
 
-      const resultAction = await dispatch(handleVerifyMeter(payload as any));
+      const resultAction = await dispatch(validateElectricityMeter(payload));
 
-      if (handleVerifyMeter.fulfilled.match(resultAction)) {
-        const res = resultAction.payload;
-        // Provider success structure you showed earlier: { success: "true", message: { content: { Customer_Name, Address } } }
-        if (res.success === "true" && res.message?.content) {
-          const { Customer_Name, Address } = res.message.content;
-          setCustomerDetails({ name: Customer_Name, address: Address });
-          setIsMeterVerified(true);
-          showToast("✅ Meter number verified successfully!", "success");
-        } else {
-          // provider returned failure
-          const providerMessage =
-            typeof res.message === "string"
-              ? res.message
-              : JSON.stringify(res.message);
-          showToast(providerMessage || "Verification failed", "error");
-          setCustomerDetails({});
-          setIsMeterVerified(false);
-          setFieldValue?.("amount", "");
-          setFieldValue?.("metertype", "");
-        }
+      if (validateElectricityMeter.fulfilled.match(resultAction)) {
+        const res = resultAction.payload?.data || resultAction.payload || {};
+        const name =
+          res?.customerName ||
+          res?.nameOnAccount ||
+          res?.Customer_Name ||
+          res?.data?.Customer_Name ||
+          "";
+        const address =
+          res?.address ||
+          res?.data?.Address ||
+          res?.Address ||
+          "";
+        setCustomerDetails({ name, address });
+        setIsMeterVerified(true);
+        showToast("✅ Meter number verified successfully!", "success");
       } else {
-        // action rejected
         const errPayload = resultAction.payload as any;
         const errorMessage =
           errPayload?.message || "Verification failed from provider";
@@ -199,44 +197,27 @@ export default function ElectricityScreen() {
     }
 
     const payload = {
-      meter_no: values.meterno,
-      type: values.metertype || selectedTab,
-      company: formatProviderName(selectedProvider?.name || values.company),
+      discoCode: selectedProvider?.code || "",
+      meterNumber: values.meterno,
+      meterType:
+        (values.metertype || selectedTab).toLowerCase() === "prepaid" ? "01" : "02",
       amount: Number(values.amount),
-      phone: values.phone || "",
-      userId: user?._id,
-      planId: selectedPlanId || "..",
-      pinCode: enteredPin,
+      phoneNumber: values.phone || "",
+      paymentIdentifier: `ELEC-${Date.now()}`,
     };
 
     setLoading(true);
     try {
-      const resultAction = await dispatch(purchaseElectricity(payload as any));
+      const resultAction = await dispatch(vendElectricity(payload));
 
-      if (purchaseElectricity.fulfilled.match(resultAction)) {
-        const { transactionId } = resultAction.payload || {};
-        showToast("✅ Electricity purchase successful!", "success");
-        if (transactionId) {
-          router.push({
-            pathname: "/(protected)/history/[id]",
-            params: { id: transactionId },
-          });
-        }
-        // reset local pin & modal handled below
+      if (vendElectricity.fulfilled.match(resultAction)) {
+        showToast("✅ Electricity vend successful!", "success");
       } else {
-        const transactionId = resultAction.payload?.transactionId;
-        if (transactionId) {
-          router.push({
-            pathname: "/(protected)/history/[id]",
-            params: { id: transactionId },
-          });
-        } else {
-          showToast(
-            resultAction.payload?.error ||
-              "❌ Electricity purchase failed. Please try again.",
-            "error"
-          );
-        }
+        showToast(
+          (resultAction.payload as any)?.error ||
+            "❌ Electricity purchase failed. Please try again.",
+          "error"
+        );
       }
     } catch (err) {
       console.error("performPurchase error:", err);
@@ -473,16 +454,18 @@ export default function ElectricityScreen() {
                     </Text>
 
                     <ScrollView>
-                      {electricityServices?.map((item: any) => {
+                      {Array.isArray(electricityProviders) &&
+                        electricityProviders.map((item: any) => {
                         const formatted = formatProvider(
-                          item.code || item.name || ""
+                          item.code || item.name ||
+                          ""
                         );
                         const logo =
                           electricityLogos[formatted] ||
                           electricityLogos.default;
                         return (
                           <TouchableOpacity
-                            key={item._id}
+                            key={item.code || item._id || item.name}
                             className="flex-row items-center p-3 border-b border-gray-300 "
                             onPress={() =>
                               handleSelectProvider(item, setFieldValue)
@@ -497,7 +480,7 @@ export default function ElectricityScreen() {
                               }}
                             />
                             <Text className="ml-3 text-base font-semibold">
-                              {item.name}
+                              {item.name || item.providerName || item.code}
                             </Text>
                           </TouchableOpacity>
                         );

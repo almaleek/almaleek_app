@@ -37,6 +37,13 @@ import { useCallback } from "react";
 
 const actions = [
   {
+    id: 6,
+    icon: <Send size={24} color="#ef4444" />,
+    label: "Send",
+    link: "(protected)/(services)/transfer",
+  },
+  {
+    
     id: 1,
     icon: <Phone size={24} color="#3b82f6" />,
     label: "Airtime",
@@ -66,12 +73,7 @@ const actions = [
     label: "TV",
     link: "(protected)/(services)/cable",
   },
-  {
-    id: 6,
-    icon: <LogOut size={24} color="#ef4444" />,
-    label: "Logout",
-    link: "logout",
-  },
+  
 ];
 
 const STATUS_ICONS: Record<string, any> = {

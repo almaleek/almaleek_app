@@ -14,10 +14,9 @@ import * as Yup from "yup";
 
 import { RootState, AppDispatch } from "@/redux/store";
 import {
-  fetchDataPlans,
-  getExamServices,
-  purchaseExam,
-} from "@/redux/features/easyAccess/service";
+  fetchExamProducts,
+  purchaseExamPin,
+} from "@/redux/features/remita/remitaSlice";
 import { examLogos } from "@/constants/examlogo";
 
 import ApSafeAreaView from "@/components/safeAreaView/safeAreaView";
@@ -39,8 +38,8 @@ export default function ExamScreen() {
     logo: examLogos.default,
   };
 
-  const examServices = useSelector(
-    (state: RootState) => state.easyAccessdataPlans.examServices
+  const { examProducts, examProductsLoading, examPurchaseLoading } = useSelector(
+    (state: RootState) => state.remita
   );
   const { user } = useSelector((state: RootState) => state.auth);
 
@@ -54,23 +53,18 @@ export default function ExamScreen() {
   const [pinVisible, setPinVisible] = useState(false);
 
   useEffect(() => {
-    dispatch(getExamServices());
+    dispatch(fetchExamProducts());
   }, [dispatch]);
 
-  const handleCategorySelect = async (category: string) => {
-    try {
-      const result = await dispatch(
-        fetchDataPlans({ category: category, network: category })
-      );
-      if (fetchDataPlans.fulfilled.match(result)) {
-        const fetchedPrice = result.payload.plans[0]?.ourPrice || 0;
-        setUnitPrice(fetchedPrice || 0);
-      } else {
-        showToast(result.payload || "Failed to fetch plans", "error");
-      }
-    } catch {
-      showToast("Unexpected error while fetching plans", "error");
-    }
+  const handleCategorySelect = async (product: any) => {
+    const price =
+      product?.price ||
+      product?.amount ||
+      product?.unitPrice ||
+      0;
+    setSelectedProvider(product);
+    setUnitPrice(Number(price) || 0);
+    setProviderModal(false);
   };
 
   /** Fix provider name → key */
@@ -104,41 +98,25 @@ export default function ExamScreen() {
       const totalAmount = Number(formValues.quantity) * unitPrice;
 
       const payload = {
-        type: selectedProvider?.code?.toLowerCase(),
-        amount: totalAmount,
-        phone: formValues.phone.trim(),
-        userId: user?._id,
-        planId: selectedProvider?._id,
-        noOfPin: Number(formValues.quantity),
-        pinCode: enteredPin,
+        productCode: selectedProvider?.code || selectedProvider?.productCode || selectedProvider?.name,
+        quantity: Number(formValues.quantity),
+        paymentIdentifier: `EXAM-${Date.now()}`,
       };
 
       setLoading(true);
 
-      const result = await dispatch(purchaseExam({ payload }));
+      const result = await dispatch(purchaseExamPin(payload));
 
       setLoading(false);
 
       // --- SUCCESS HANDLER ---
-      if (purchaseExam.fulfilled.match(result)) {
+      if (purchaseExamPin.fulfilled.match(result)) {
         showToast("✅ Exam Pin purchase successful!", "success");
-        const { request_id } = result.payload;
-        router.push({
-          pathname: "/(protected)/history/[id]",
-          params: { id: request_id },
-        });
       }
 
-      const transactionId = result?.payload?.transactionId;
-
-      if (transactionId) {
-        router.push({
-          pathname: "/(protected)/history/[id]",
-          params: { id: transactionId },
-        });
-        return;
+      if (!purchaseExamPin.fulfilled.match(result)) {
+        showToast(result?.payload?.error || "Exam purchase failed..", "error");
       }
-      showToast(result?.payload || "Exam purchase failed..", "error");
     } catch (error: any) {
       setLoading(false);
       showToast(error?.message || "Something went wrong! Try again.", "error");
@@ -188,7 +166,7 @@ export default function ExamScreen() {
                 <View className="flex-row items-center gap-3">
                   <Image
                     source={
-                      selectedProvider
+                      selectedProvider?.code
                         ? examLogos[formatProvider(selectedProvider.code)] ||
                           examLogos.default
                         : defaultProvider.logo
@@ -197,7 +175,7 @@ export default function ExamScreen() {
                   />
 
                   <Text className="text-gray-700 font-semibold">
-                    {selectedProvider?.name || "Select Exam Type"}
+                    {selectedProvider?.name || selectedProvider?.productName || "Select Exam Type"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -252,25 +230,24 @@ export default function ExamScreen() {
                     </Text>
 
                     <ScrollView>
-                      {examServices?.map((item: any) => (
+                      {Array.isArray(examProducts) &&
+                        examProducts.map((item: any) => (
                         <TouchableOpacity
-                          key={item._id}
+                          key={item.code || item._id || item.name}
                           className="flex-row items-center p-3 border-b border-gray-200"
                           onPress={() => {
-                            setSelectedProvider(item);
-                            setProviderModal(false);
-                            handleCategorySelect(item.code);
+                            handleCategorySelect(item);
                           }}
                         >
                           <Image
                             source={
-                              examLogos[formatProvider(item.code)] ||
+                              examLogos[formatProvider(item.code || item.productCode)] ||
                               examLogos.default
                             }
                             style={{ width: 40, height: 40, borderRadius: 50 }}
                           />
                           <Text className="ml-3 text-base font-semibold">
-                            {item.name}
+                            {item.name || item.productName}
                           </Text>
                         </TouchableOpacity>
                       ))}

@@ -9,7 +9,7 @@ import { setTokens, logout } from "@/redux/features/user/userSlice";
 import ApLoader from "@/components/loaders/mainloader";
 import { injectLogoutHandler } from "@/redux/apis/common/aixosInstance";
 
-import { useRouter, useRootNavigationState, Slot } from "expo-router";
+import { useRouter, Slot } from "expo-router";
 import { Provider, useDispatch } from "react-redux";
 import { store } from "@/redux/store";
 
